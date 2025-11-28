@@ -29,7 +29,7 @@ def run_pipeline():
     config = {
         'period': '7d', 
         'seq_len': 30,  
-        'epochs': 5,    
+        'epochs': 30,
         'batch_size': 32,
         'hidden_dim': 64,
         'd_model': 64,
@@ -53,13 +53,13 @@ def run_pipeline():
         try:
             logger.info(f"Processing {ticker}...")
         
-        # Get Market Cap
-        mcap = get_market_cap(ticker)
-        if mcap:
-            market_cap_map[ticker] = mcap
-        
-        trained_models = []
-        test_data_cache = None
+            # Get Market Cap
+            mcap = get_market_cap(ticker)
+            if mcap:
+                market_cap_map[ticker] = mcap
+            
+            trained_models = []
+            test_data_cache = None
         
             # Train individual models
             for model_type in model_types:
