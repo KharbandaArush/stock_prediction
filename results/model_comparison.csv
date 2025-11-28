@@ -1,0 +1,93 @@
+Model,execution_rate_high,execution_rate_low,executed_mask_high,executed_mask_low,avg_alpha_high,avg_alpha_low
+ensemble,1.0,0.0,"0      True
+1      True
+2      True
+3      True
+4      True
+       ... 
+404    True
+405    True
+406    True
+407    True
+408    True
+Length: 2045, dtype: bool","0      False
+1      False
+2      False
+3      False
+4      False
+       ...  
+404    False
+405    False
+406    False
+407    False
+408    False
+Length: 2045, dtype: bool",-0.3521325525341145,0.0
+lstm,1.0,0.0,"0      True
+1      True
+2      True
+3      True
+4      True
+       ... 
+404    True
+405    True
+406    True
+407    True
+408    True
+Length: 2045, dtype: bool","0      False
+1      False
+2      False
+3      False
+4      False
+       ...  
+404    False
+405    False
+406    False
+407    False
+408    False
+Length: 2045, dtype: bool",-0.5937476784137616,0.0
+transformer,1.0,0.0,"0      True
+1      True
+2      True
+3      True
+4      True
+       ... 
+404    True
+405    True
+406    True
+407    True
+408    True
+Length: 2045, dtype: bool","0      False
+1      False
+2      False
+3      False
+4      False
+       ...  
+404    False
+405    False
+406    False
+407    False
+408    False
+Length: 2045, dtype: bool",-0.463776124887081,0.0
+xgboost,0.4449877750611247,0.1902200488997555,"0      True
+1      True
+2      True
+3      True
+4      True
+       ... 
+404    True
+405    True
+406    True
+407    True
+408    True
+Length: 2045, dtype: bool","0      False
+1      False
+2      False
+3      False
+4      False
+       ...  
+404    False
+405    False
+406    False
+407    False
+408    False
+Length: 2045, dtype: bool",-0.0019041595645860482,0.00706883740078535
