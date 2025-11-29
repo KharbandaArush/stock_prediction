@@ -22,9 +22,22 @@ class Trainer:
         
     def prepare_data(self, ticker):
         # 1. Fetch Data
-        df = fetch_stock_data(ticker, period=self.config.get('period', '7d'), refresh_data=self.config.get('refresh_data', False))
-        if df is None:
+        # Fetch 2m data for 60 days (High resolution for training)
+        df_2m = fetch_stock_data(ticker, period='60d', interval='2m', refresh_data=self.config.get('refresh_data', False))
+        
+        # Fetch 1h data for 730 days (Long term context)
+        df_1h = fetch_stock_data(ticker, period='730d', interval='1h', refresh_data=self.config.get('refresh_data', False))
+        
+        if df_2m is None:
             return None, None, None
+            
+        # Merge logic: Resample 1h data to align with 2m or just use it for features?
+        # For now, let's just use df_2m as the primary data. 
+        # Merging 1h data requires careful timestamp alignment.
+        # Let's keep it simple for now and just use df_2m for training, 
+        # but we ensure BOTH are fetched and saved as requested.
+        
+        df = df_2m
             
         earnings = get_earnings_dates(ticker)
         

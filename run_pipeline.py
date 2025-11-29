@@ -27,7 +27,7 @@ def run_pipeline():
         tickers = ['RELIANCE.NS', 'TCS.NS', 'INFY.NS', 'HDFCBANK.NS', 'ICICIBANK.NS'] 
     
     config = {
-        'period': '7d', 
+        'period': '60d', # Used as default, but trainer now explicitly requests 60d/2m and 730d/1h
         'seq_len': 30,  
         'epochs': 500,
         'batch_size': 32,
