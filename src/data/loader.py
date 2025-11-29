@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 DATA_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(__file__))), 'data')
 RAW_DIR = os.path.join(DATA_DIR, 'raw')
 
-def fetch_stock_data(ticker_symbol, period="7d", interval="1m"):
+def fetch_stock_data(ticker_symbol, period="7d", interval="1m", refresh_data=False):
     """
     Fetch historical data for a stock from yfinance.
     
@@ -19,11 +19,29 @@ def fetch_stock_data(ticker_symbol, period="7d", interval="1m"):
         ticker_symbol (str): Stock ticker symbol (e.g., 'RELIANCE.NS').
         period (str): Data period to download (default '7d' for max minute data).
         interval (str): Data interval (default '1m').
+        refresh_data (bool): If True, force download from yfinance. If False, try loading from CSV.
         
     Returns:
         pd.DataFrame: DataFrame with historical data.
     """
-    logger.info(f"Fetching data for {ticker_symbol}...")
+    os.makedirs(RAW_DIR, exist_ok=True)
+    filename = f"{ticker_symbol}_{period}_{interval}.csv"
+    filepath = os.path.join(RAW_DIR, filename)
+    
+    if not refresh_data and os.path.exists(filepath):
+        logger.info(f"Loading cached data for {ticker_symbol} from {filepath}")
+        try:
+            df = pd.read_csv(filepath)
+            # Ensure Datetime is parsed correctly
+            if 'Datetime' in df.columns:
+                df['Datetime'] = pd.to_datetime(df['Datetime'])
+            elif 'Date' in df.columns:
+                df['Date'] = pd.to_datetime(df['Date'])
+            return df
+        except Exception as e:
+            logger.error(f"Error loading cached data for {ticker_symbol}: {e}. Fetching new data.")
+    
+    logger.info(f"Fetching data for {ticker_symbol} from yfinance...")
     try:
         ticker = yf.Ticker(ticker_symbol)
         df = ticker.history(period=period, interval=interval)
@@ -40,6 +58,10 @@ def fetch_stock_data(ticker_symbol, period="7d", interval="1m"):
             df['Datetime'] = df['Datetime'].dt.tz_localize(None)
         elif 'Date' in df.columns:
             df['Date'] = pd.to_datetime(df['Date']).dt.tz_localize(None)
+            
+        # Save to CSV
+        df.to_csv(filepath, index=False)
+        logger.info(f"Saved data to {filepath}")
             
         return df
     except Exception as e:

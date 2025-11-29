@@ -33,7 +33,9 @@ def run_pipeline():
         'batch_size': 32,
         'hidden_dim': 64,
         'd_model': 64,
-        'xgb_params': {'n_estimators': 50, 'max_depth': 5}
+        'xgb_params': {'n_estimators': 50, 'max_depth': 5},
+        'refresh_data': False, # Set to True to force re-download
+        'patience': 5 # Early stopping patience
     }
     
     results_dir = 'stock_prediction/results'
@@ -80,8 +82,21 @@ def run_pipeline():
                     
                     pred_high, pred_low = predict_with_model(model, X_test, model_type, trainer.device)
                     
+                    # Inverse Transform
+                    # Stack predictions and actuals to match (N, 2) shape for scaler
+                    preds_stacked = np.column_stack((pred_high, pred_low))
+                    actuals_stacked = np.column_stack((y_h_test, y_l_test))
+                    
+                    preds_inv = preprocessor.inverse_transform_target(preds_stacked)
+                    actuals_inv = preprocessor.inverse_transform_target(actuals_stacked)
+                    
+                    pred_high_inv = preds_inv[:, 0]
+                    pred_low_inv = preds_inv[:, 1]
+                    y_h_test_inv = actuals_inv[:, 0]
+                    y_l_test_inv = actuals_inv[:, 1]
+                    
                     # Create result dataframe
-                    df_res = create_result_df(ticker, y_h_test, y_l_test, pred_high, pred_low, model_type)
+                    df_res = create_result_df(ticker, y_h_test_inv, y_l_test_inv, pred_high_inv, pred_low_inv, model_type)
                     all_model_results.append(df_res)
                     
                 except Exception as e:
@@ -101,7 +116,19 @@ def run_pipeline():
                     
                     pred_high, pred_low = ensemble.predict(X_test)
                     
-                    df_res = create_result_df(ticker, y_h_test, y_l_test, pred_high, pred_low, 'ensemble')
+                    # Inverse Transform for Ensemble
+                    preds_stacked = np.column_stack((pred_high, pred_low))
+                    actuals_stacked = np.column_stack((y_h_test, y_l_test))
+                    
+                    preds_inv = preprocessor.inverse_transform_target(preds_stacked)
+                    actuals_inv = preprocessor.inverse_transform_target(actuals_stacked)
+                    
+                    pred_high_inv = preds_inv[:, 0]
+                    pred_low_inv = preds_inv[:, 1]
+                    y_h_test_inv = actuals_inv[:, 0]
+                    y_l_test_inv = actuals_inv[:, 1]
+                    
+                    df_res = create_result_df(ticker, y_h_test_inv, y_l_test_inv, pred_high_inv, pred_low_inv, 'ensemble')
                     all_model_results.append(df_res)
                     
                 except Exception as e:

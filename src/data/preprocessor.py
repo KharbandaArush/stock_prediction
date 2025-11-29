@@ -10,14 +10,20 @@ class DataPreprocessor:
         self.sequence_length = sequence_length
         self.prediction_horizon = prediction_horizon
         self.scaler = MinMaxScaler(feature_range=(0, 1))
+        self.target_scaler = MinMaxScaler(feature_range=(0, 1))
         self.feature_columns = None
+        self.target_columns = None
         
-    def fit(self, df, feature_cols):
+    def fit(self, df, feature_cols, target_cols=None):
         """
         Fit the scaler on the training data.
         """
         self.feature_columns = feature_cols
         self.scaler.fit(df[feature_cols])
+        
+        if target_cols:
+            self.target_columns = target_cols
+            self.target_scaler.fit(df[target_cols])
         
     def transform(self, df):
         """
@@ -28,7 +34,42 @@ class DataPreprocessor:
             
         df_scaled = df.copy()
         df_scaled[self.feature_columns] = self.scaler.transform(df[self.feature_columns])
+        
+        if self.target_columns:
+            # Ensure target columns exist
+            valid_targets = [c for c in self.target_columns if c in df.columns]
+            if valid_targets:
+                df_scaled[valid_targets] = self.target_scaler.transform(df[valid_targets])
+                
         return df_scaled
+
+    def inverse_transform_target(self, data):
+        """
+        Inverse transform target data.
+        Args:
+            data (np.array): Scaled target data (n_samples, n_targets).
+        Returns:
+            np.array: Inverse transformed data.
+        """
+        if self.target_columns is None:
+            return data
+        return self.target_scaler.inverse_transform(data)
+
+    def inverse_transform(self, data, columns):
+        """
+        Inverse transform specific columns.
+        
+        Args:
+            data (np.array): Scaled data array (n_samples, n_features).
+            columns (list): List of column names corresponding to the data.
+            
+        Returns:
+            np.array: Inverse transformed data.
+        """
+        # We need to construct a dummy array with the same shape as the scaler expects
+        # This is a limitation of sklearn's MinMaxScaler which expects the same number of features
+        # A better approach for targets is to have a separate scaler
+        pass
         
     def create_sequences(self, df, target_col_high, target_col_low):
         """

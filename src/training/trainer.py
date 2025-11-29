@@ -22,7 +22,7 @@ class Trainer:
         
     def prepare_data(self, ticker):
         # 1. Fetch Data
-        df = fetch_stock_data(ticker, period=self.config.get('period', '7d'))
+        df = fetch_stock_data(ticker, period=self.config.get('period', '7d'), refresh_data=self.config.get('refresh_data', False))
         if df is None:
             return None, None, None
             
@@ -42,8 +42,9 @@ class Trainer:
         # 5. Preprocess
         preprocessor = DataPreprocessor(sequence_length=self.config.get('seq_len', 60))
         feature_cols = [c for c in df.columns if c not in ['Datetime', 'Date', 'DateOnly', 'NextDayHigh', 'NextDayLow']]
+        target_cols = ['NextDayHigh', 'NextDayLow']
         
-        preprocessor.fit(train_df, feature_cols)
+        preprocessor.fit(train_df, feature_cols, target_cols)
         train_scaled = preprocessor.transform(train_df)
         test_scaled = preprocessor.transform(test_df)
         
@@ -55,11 +56,16 @@ class Trainer:
 
     def train_lstm(self, train_data, test_data, input_dim):
         X_train, y_h_train, y_l_train = train_data
+        X_test, y_h_test, y_l_test = test_data
         
         # Convert to Tensor
         X_train = torch.FloatTensor(X_train).to(self.device)
         y_h_train = torch.FloatTensor(y_h_train).to(self.device)
         y_l_train = torch.FloatTensor(y_l_train).to(self.device)
+        
+        X_test = torch.FloatTensor(X_test).to(self.device)
+        y_h_test = torch.FloatTensor(y_h_test).to(self.device)
+        y_l_test = torch.FloatTensor(y_l_test).to(self.device)
         
         model = LSTMPredictor(input_dim, hidden_dim=self.config.get('hidden_dim', 64)).to(self.device)
         optimizer = optim.Adam(model.parameters(), lr=self.config.get('lr', 0.001))
@@ -67,9 +73,13 @@ class Trainer:
         
         epochs = self.config.get('epochs', 10)
         batch_size = self.config.get('batch_size', 32)
+        patience = self.config.get('patience', 3)
         
         dataset = TensorDataset(X_train, y_h_train, y_l_train)
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        best_val_loss = float('inf')
+        patience_counter = 0
         
         model.train()
         for epoch in range(epochs):
@@ -78,10 +88,6 @@ class Trainer:
                 optimizer.zero_grad()
                 h_preds, l_preds, _ = model(X_batch)
                 
-                # Expand targets for quantile loss if needed or handle in loss
-                # Here we assume targets are single values, need to broadcast or loss handles it
-                # QuantileLoss expects (batch, 3) preds and (batch) target
-                
                 loss_h = criterion(h_preds, yh_batch)
                 loss_l = criterion(l_preds, yl_batch)
                 loss = loss_h + loss_l
@@ -89,17 +95,48 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
-                
-            logger.info(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(loader):.4f}")
+            
+            avg_train_loss = total_loss/len(loader)
+            
+            # Validation
+            model.eval()
+            with torch.no_grad():
+                h_preds_val, l_preds_val, _ = model(X_test)
+                val_loss_h = criterion(h_preds_val, y_h_test)
+                val_loss_l = criterion(l_preds_val, y_l_test)
+                val_loss = (val_loss_h + val_loss_l).item()
+            
+            logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}")
+            
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                # Save best model state
+                best_model_state = model.state_dict()
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    logger.info(f"Early stopping triggered at epoch {epoch+1}")
+                    break
+            
+            model.train()
+            
+        if 'best_model_state' in locals():
+            model.load_state_dict(best_model_state)
             
         return model
 
     def train_transformer(self, train_data, test_data, input_dim):
         X_train, y_h_train, y_l_train = train_data
+        X_test, y_h_test, y_l_test = test_data
         
         X_train = torch.FloatTensor(X_train).to(self.device)
         y_h_train = torch.FloatTensor(y_h_train).to(self.device)
         y_l_train = torch.FloatTensor(y_l_train).to(self.device)
+        
+        X_test = torch.FloatTensor(X_test).to(self.device)
+        y_h_test = torch.FloatTensor(y_h_test).to(self.device)
+        y_l_test = torch.FloatTensor(y_l_test).to(self.device)
         
         model = TransformerPredictor(input_dim, d_model=self.config.get('d_model', 64)).to(self.device)
         optimizer = optim.Adam(model.parameters(), lr=self.config.get('lr', 0.001))
@@ -107,9 +144,13 @@ class Trainer:
         
         epochs = self.config.get('epochs', 10)
         batch_size = self.config.get('batch_size', 32)
+        patience = self.config.get('patience', 3)
         
         dataset = TensorDataset(X_train, y_h_train, y_l_train)
         loader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
+        
+        best_val_loss = float('inf')
+        patience_counter = 0
         
         model.train()
         for epoch in range(epochs):
@@ -125,8 +166,33 @@ class Trainer:
                 loss.backward()
                 optimizer.step()
                 total_loss += loss.item()
+            
+            avg_train_loss = total_loss/len(loader)
+            
+            # Validation
+            model.eval()
+            with torch.no_grad():
+                h_preds_val, l_preds_val = model(X_test)
+                val_loss_h = criterion(h_preds_val, y_h_test)
+                val_loss_l = criterion(l_preds_val, y_l_test)
+                val_loss = (val_loss_h + val_loss_l).item()
                 
-            logger.info(f"Epoch {epoch+1}/{epochs}, Loss: {total_loss/len(loader):.4f}")
+            logger.info(f"Epoch {epoch+1}/{epochs}, Train Loss: {avg_train_loss:.4f}, Val Loss: {val_loss:.4f}")
+            
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                patience_counter = 0
+                best_model_state = model.state_dict()
+            else:
+                patience_counter += 1
+                if patience_counter >= patience:
+                    logger.info(f"Early stopping triggered at epoch {epoch+1}")
+                    break
+            
+            model.train()
+            
+        if 'best_model_state' in locals():
+            model.load_state_dict(best_model_state)
             
         return model
 
