@@ -29,7 +29,7 @@ def run_pipeline():
     config = {
         'period': '7d', 
         'seq_len': 30,  
-        'epochs': 30,
+        'epochs': 500,
         'batch_size': 32,
         'hidden_dim': 64,
         'd_model': 64,
